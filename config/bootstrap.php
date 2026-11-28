@@ -1187,6 +1187,8 @@ function ensure_environment_admin(PDO $db): void {
 function public_user(array $user): array { return ['id'=>(int)$user['id'],'name'=>$user['name'],'email'=>$user['email'],'role'=>$user['role']]; }
 function php_session_user(PDO $db): ?array
 {
+    // PHP sessions are reserved exclusively for the separately authenticated Admin console.
+    if (($_SESSION['auth_mode'] ?? '') !== 'admin_password') return null;
     $id = (int)($_SESSION['user_id'] ?? 0);
     if ($id < 1) return null;
     $stmt = $db->prepare('SELECT id,name,email,role FROM users WHERE id = :id LIMIT 1');
@@ -1215,8 +1217,9 @@ function require_admin(PDO $db): array
     // The Admin console intentionally uses a separate PHP email/password session.
     // A Neon Auth customer token or a matching Google email can never grant Admin.
     $user = php_session_user($db);
-    if (!$user || ($user['role'] ?? '') !== 'admin'
-        || ($_SESSION['auth_mode'] ?? '') !== 'admin_password') {
+    if (!env_bool('ADMIN_SESSION_FALLBACK_ENABLED', true)
+        || preg_match('/^Bearer\b/i', neon_auth_authorization_header())
+        || !$user || ($user['role'] ?? '') !== 'admin') {
         json_response(['ok' => false, 'error' => 'Bạn cần đăng nhập bằng tài khoản quản trị riêng.'], 403);
     }
     return $user;

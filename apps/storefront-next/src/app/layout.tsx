@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://hendystore.onrender.com";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://hendy-store.onrender.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -31,16 +31,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <nav aria-label="Điều hướng chính">
             <a href="/">Trang chủ</a>
             <a href="/#apps">Ứng dụng</a>
-            <a href="https://hendystore.onrender.com/library/">Thư viện</a>
+            <a href="https://hendy-store.onrender.com/library/">Thư viện</a>
+            <a href="/sign-in">Đăng nhập</a>
+            <a href="/account">Tài khoản</a>
           </nav>
         </header>
         {children}
         <footer className="site-footer">
           <div>© {new Date().getFullYear()} Hendy Store</div>
           <nav aria-label="Liên kết pháp lý">
-            <a href="https://hendystore.onrender.com/privacy/">Quyền riêng tư</a>
-            <a href="https://hendystore.onrender.com/terms-of-use/">Điều khoản</a>
-            <a href="https://hendystore.onrender.com/developer/">Nhà phát triển</a>
+            <a href="https://hendy-store.onrender.com/privacy/">Quyền riêng tư</a>
+            <a href="https://hendy-store.onrender.com/terms-of-use/">Điều khoản</a>
+            <a href="https://hendy-store.onrender.com/developer/">Nhà phát triển</a>
           </nav>
         </footer>
       </body>
