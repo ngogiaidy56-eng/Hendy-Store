@@ -39,7 +39,7 @@ PHP/Render:
 
 Optional Next.js Render service:
 - `NEON_AUTH_BASE_URL` must point to the same Auth branch as the PHP service.
-- `NEON_AUTH_COOKIE_SECRET` is a separate server-only random secret, 32+ characters. Generate locally with `openssl rand -base64 32` and store it only in the Next service Environment.
+- `NEON_AUTH_COOKIE_SECRET` is a separate server-only random secret, 32+ characters. The optional `render.next.yaml` Blueprint asks Render to generate it; for manual setup, generate locally with `openssl rand -base64 32` and store it only in the Next service Environment.
 - `HENDY_API_ORIGIN` must point to the active PHP Render service URL.
 
 Google OAuth activation:

@@ -80,7 +80,7 @@ export function AccountPanel({ initialIdentity }: { initialIdentity: AccountIden
           <span>Vai trò: {user?.role || "Đang xác minh"}</span>
         </div>
         <div className="account-actions">
-          <a className="button" href="https://hendy-store.onrender.com/library/">Mở thư viện</a>
+          <a className="button" href="/#apps">Khám phá ứng dụng</a>
           <button className="account-logout" type="button" disabled={busy} onClick={logout}>Đăng xuất</button>
         </div>
       </div>

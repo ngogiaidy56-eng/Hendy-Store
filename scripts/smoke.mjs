@@ -281,3 +281,5 @@ assert.ok(nextBlueprint.includes("https://hendy-store.onrender.com"), "Next serv
 assert.ok(hardenedBootstrap.includes("($jwtHeader['alg'] ?? '') !== 'EdDSA'"), "Neon JWT verifier must pin EdDSA");
 assert.ok(hardenedBootstrap.includes("hash_equals($expectedIssuer, (string)$claims->iss)"), "JWT issuer must exactly match the Neon Auth origin");
 assert.ok(hardenedBootstrap.includes("'follow_location' => 0"), "JWKS fetch must not follow cross-host redirects");
+
+assert.ok(nextBlueprint.includes("generateValue: true"), "Render should generate the Next-only auth cookie secret");
