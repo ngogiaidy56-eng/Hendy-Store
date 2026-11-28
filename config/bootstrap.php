@@ -1031,6 +1031,7 @@ function neon_auth_user(PDO $db): ?array
         return public_user($account);
     }
 
+    // An unlinked social identity must never inherit an existing Admin role.
     // Email-based linking and first-time provisioning require an explicit verified claim.
     if (!$verified) return null;
 

@@ -7,7 +7,7 @@ services:
     dockerContext: .
     plan: free
     region: singapore
-    autoDeploy: false
+    autoDeployTrigger: off
     healthCheckPath: /api/health
     envVars:
       - key: PORT

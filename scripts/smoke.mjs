@@ -276,6 +276,8 @@ assert.ok(apiSource.includes("Đăng ký khách hàng qua PHP đã ngừng hỗ 
 assert.ok(apiSource.includes("'registrationEnabled' => false"), "Legacy PHP registration must remain disabled");
 const nextBlueprint = await readFile("render.next.yaml", "utf8");
 assert.ok(nextBlueprint.includes("NEON_AUTH_COOKIE_SECRET"), "Next service must declare its private Auth cookie secret");
+assert.ok(nextBlueprint.includes("generateValue: true"), "Render should generate the Next-only auth cookie secret");
+assert.ok(nextBlueprint.includes("autoDeployTrigger: off"), "Next service should avoid deploying before CI/security configuration is reviewed");
 assert.ok(nextBlueprint.includes("https://hendy-store.onrender.com"), "Next service must target the PHP Render service");
 
 assert.ok(hardenedBootstrap.includes("($jwtHeader['alg'] ?? '') !== 'EdDSA'"), "Neon JWT verifier must pin EdDSA");
