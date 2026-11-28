@@ -230,7 +230,8 @@ try {
                     'user' => $user,
                     'csrfToken' => csrf_token(),
                     'storeName' => env_value('STORE_NAME', 'Hendy Store'),
-                    'registrationEnabled' => env_bool('ALLOW_REGISTRATION', false),
+                    'registrationEnabled' => false,
+                    'adminSessionFallbackEnabled' => env_bool('ADMIN_SESSION_FALLBACK_ENABLED', true),
                     'neonAuthEnabled' => env_value('NEON_AUTH_BASE_URL') !== null,
                     'neonAuthPublicSignup' => env_bool('NEON_AUTH_PUBLIC_SIGNUP', false),
                     'googleOAuthEnabled' => env_bool('GOOGLE_OAUTH_ENABLED', false) && env_value('NEON_AUTH_BASE_URL') !== null,
@@ -307,61 +308,39 @@ try {
         case 'login':
             require_method('POST');
             require_csrf();
+            if (!env_bool('ADMIN_SESSION_FALLBACK_ENABLED', true)) {
+                json_response(['ok' => false, 'error' => 'Đăng nhập quản trị qua PHP session đang bị tắt.'], 403);
+            }
             $input = request_data();
-            $email = strtolower(trim((string) ($input['email'] ?? '')));
-            $password = (string) ($input['password'] ?? '');
+            $email = strtolower(trim((string)($input['email'] ?? '')));
+            $password = (string)($input['password'] ?? '');
             if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190 || strlen($password) > 1024) {
                 json_response(['ok' => false, 'error' => 'Email hoặc mật khẩu không chính xác.'], 401);
             }
-            rate_limit_or_fail($db, 'login-ip', 30, 900);
-            rate_limit_or_fail($db, 'login-account-' . $email, 8, 900);
-            $stmt = $db->prepare('SELECT id, name, email, password_hash, role FROM users WHERE email = :email LIMIT 1');
+            rate_limit_or_fail($db, 'admin-login-ip', 20, 900);
+            rate_limit_or_fail($db, 'admin-login-account-' . $email, 8, 900);
+            $stmt = $db->prepare("SELECT id,name,email,password_hash,role FROM users WHERE LOWER(email) = :email AND role = 'admin' LIMIT 1");
             $stmt->execute([':email' => $email]);
             $account = $stmt->fetch();
-            if (!$account || !password_verify($password, $account['password_hash'])) {
+            if (!$account || !password_verify($password, (string)($account['password_hash'] ?? ''))) {
                 password_verify($password, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.');
                 json_response(['ok' => false, 'error' => 'Email hoặc mật khẩu không chính xác.'], 401);
             }
             session_regenerate_id(true);
-            $_SESSION['user_id'] = (int) $account['id'];
+            $_SESSION['user_id'] = (int)$account['id'];
+            $_SESSION['auth_mode'] = 'admin_password';
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             json_response(['ok' => true, 'data' => ['user' => public_user($account), 'csrfToken' => csrf_token()]]);
-            break;
 
         case 'register':
             require_method('POST');
             require_csrf();
-            if (!env_bool('ALLOW_REGISTRATION', false)) {
-                json_response(['ok' => false, 'error' => 'Đăng ký tài khoản hiện đang tạm khóa. Vui lòng liên hệ đơn vị vận hành.'], 403);
-            }
-            rate_limit_or_fail($db, 'register', 4, 3600);
-            $input = request_data();
-            $name = trim((string) ($input['name'] ?? ''));
-            $email = strtolower(trim((string) ($input['email'] ?? '')));
-            $password = (string) ($input['password'] ?? '');
-            if (unicode_length($name) < 2 || unicode_length($name) > 80) {
-                json_response(['ok' => false, 'error' => 'Tên phải có từ 2 đến 80 ký tự.'], 422);
-            }
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
-                json_response(['ok' => false, 'error' => 'Email không hợp lệ.'], 422);
-            }
-            if (unicode_length($password) < 12 || strlen($password) > 72) {
-                json_response(['ok' => false, 'error' => 'Mật khẩu cần tối thiểu 12 ký tự và không vượt quá 72 byte.'], 422);
-            }
-            try {
-                $insert = $db->prepare('INSERT INTO users (name, email, password_hash, role, created_at) VALUES (:name, :email, :hash, :role, :created)');
-                $insert->execute([':name' => $name, ':email' => $email, ':hash' => password_hash($password, PASSWORD_DEFAULT), ':role' => 'customer', ':created' => date('Y-m-d H:i:s')]);
-            } catch (PDOException $error) {
-                if ((string) $error->getCode() === '23000' || str_contains(strtolower($error->getMessage()), 'unique')) {
-                    json_response(['ok' => false, 'error' => 'Email này đã được sử dụng.'], 409);
-                }
-                throw $error;
-            }
-            session_regenerate_id(true);
-            $_SESSION['user_id'] = (int) $db->lastInsertId();
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-            json_response(['ok' => true, 'data' => ['user' => ['id' => (int) $_SESSION['user_id'], 'name' => $name, 'email' => $email, 'role' => 'customer'], 'csrfToken' => csrf_token()]], 201);
-            break;
+            json_response([
+                'ok' => false,
+                'error' => 'Đăng ký khách hàng qua PHP đã ngừng hỗ trợ. Hãy sử dụng Neon Auth Managed Better Auth.',
+            ], 410);
+
+
 
         case 'logout':
             require_method('POST');

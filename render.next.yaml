@@ -7,7 +7,7 @@ services:
     dockerContext: .
     plan: free
     region: singapore
-    autoDeploy: false
+    autoDeployTrigger: off
     healthCheckPath: /api/health
     envVars:
       - key: PORT
@@ -15,8 +15,12 @@ services:
       - key: NODE_ENV
         value: production
       - key: HENDY_API_ORIGIN
-        value: https://hendystore.onrender.com
+        value: https://hendy-store.onrender.com
+      - key: NEON_AUTH_BASE_URL
+        value: https://ep-withered-sunset-bekyloue.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth
+      - key: NEON_AUTH_COOKIE_SECRET
+        generateValue: true
       - key: NEXT_PUBLIC_SITE_URL
-        sync: false
+        value: https://hendystore-next.onrender.com
       - key: DEPLOY_TARGET
         value: render

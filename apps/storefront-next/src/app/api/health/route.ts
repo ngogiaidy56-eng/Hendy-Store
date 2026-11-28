@@ -1,5 +1,5 @@
 export async function GET(): Promise<Response> {
-  const rawOrigin = String(process.env.HENDY_API_ORIGIN || "https://hendystore.onrender.com");
+  const rawOrigin = String(process.env.HENDY_API_ORIGIN || "https://hendy-store.onrender.com");
   const origin = rawOrigin.endsWith("/") ? rawOrigin.slice(0, -1) : rawOrigin;
   try {
     const response = await fetch(origin + "/api.php?action=health", { cache: "no-store" });

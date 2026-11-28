@@ -7,9 +7,19 @@ async function proxy(request: NextRequest): Promise<Response> {
   }
   const target = new URL(origin + "/api.php" + request.nextUrl.search);
   const headers = new Headers(request.headers);
+  // Do not relay client-controlled forwarding metadata into the PHP trust boundary.
+  for (const header of [
+    "host",
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-port",
+    "x-forwarded-proto",
+    "x-forwarded-prefix",
+    "x-real-ip",
+  ]) headers.delete(header);
   headers.set("X-Forwarded-Host", request.nextUrl.host);
   headers.set("X-Forwarded-Proto", "https");
-  headers.delete("host");
   const upstream = await fetch(new Request(target, {
     method: request.method,
     headers,

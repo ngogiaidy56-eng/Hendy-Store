@@ -234,3 +234,63 @@ assert.ok(!deploymentWorkflow.includes("HYPERDRIVE"), "Deployment workflow must 
 assert.ok(!deploymentWorkflow.includes("MYSQL_HYPERDRIVE"), "Deployment workflow must not configure MySQL Hyperdrive");
 
 console.log("Neon source smoke test passed: Auth, least-privilege Data API catalogue, Object Storage, Functions, AI Gateway and Realtime.");
+
+
+// Authentication hardening contracts.
+const nextPackage = JSON.parse(await readFile("apps/storefront-next/package.json", "utf8"));
+assert.ok(nextPackage.dependencies?.["@neon/auth"], "Next storefront must use Neon Managed Auth SDK");
+assert.equal(nextPackage.dependencies?.next, "16.4.6", "Next version must match the target");
+assert.equal(nextPackage.dependencies?.react, "19.3.1", "React version must match the target");
+assert.equal(nextPackage.devDependencies?.tailwindcss, "4.3.5", "Tailwind version must match the target");
+const authServer = await readFile("apps/storefront-next/src/lib/auth/server.ts", "utf8");
+const authClient = await readFile("apps/storefront-next/src/lib/auth/client.ts", "utf8");
+const authRoute = await readFile("apps/storefront-next/src/app/api/auth/[...path]/route.ts", "utf8");
+const signInUi = await readFile("apps/storefront-next/src/app/sign-in/sign-in-form.tsx", "utf8");
+const accountUi = await readFile("apps/storefront-next/src/app/account/account-panel.tsx", "utf8");
+for (const [source, token, label] of [
+  [authServer, "createNeonAuth", "Next Managed Auth server adapter"],
+  [authServer, "NEON_AUTH_COOKIE_SECRET", "server-only Auth cookie secret"],
+  [authClient, "createAuthClient", "same-origin Managed Auth browser client"],
+  [authRoute, "getNeonAuth().handler()", "Managed Auth catch-all handler"],
+  [signInUi, "authClient.signIn.email", "Next email/password sign-in"],
+  [signInUi, "authClient.signIn.social", "Next Google OAuth sign-in"],
+  [signInUi, "googleOAuthEnabled", "Google feature flag"],
+  [signInUi, "neonAuthPublicSignup", "Neon signup feature flag"],
+  [accountUi, "Authorization", "backend JWT verification on account screen"],
+  [accountUi, "authClient.signOut", "Managed Auth sign-out"],
+]) assert.ok(source.includes(token), "Missing " + label);
+
+const hardenedBootstrap = await readFile("config/bootstrap.php", "utf8");
+for (const [token, label] of [
+  ["session.cookie_httponly", "HttpOnly session cookie"],
+  ["session.cookie_secure", "Secure session cookie"],
+  ["app_security_origin_allowed", "CSRF exact Origin validation"],
+  ["Sec-Fetch-Site", "cross-site Fetch Metadata rejection"],
+  ["isset($claims->sub, $claims->exp, $claims->iss)", "strict JWT issuer check"],
+  ["neon_auth_jwks($attempt === 1)", "JWKS key-rotation refresh"],
+  ["PHP sessions are reserved exclusively", "Admin-only PHP session"],
+  ["preg_match('/^Bearer", "Bearer-token Admin isolation"],
+]) assert.ok(hardenedBootstrap.includes(token), "Missing " + label);
+assert.ok(apiSource.includes("ADMIN_SESSION_FALLBACK_ENABLED"), "Admin session fallback feature flag required");
+assert.ok(apiSource.includes("Đăng ký khách hàng qua PHP đã ngừng hỗ trợ"), "Customer registration must use Neon Auth only");
+assert.ok(apiSource.includes("'registrationEnabled' => false"), "Legacy PHP registration must remain disabled");
+const nextBlueprint = await readFile("render.next.yaml", "utf8");
+assert.ok(nextBlueprint.includes("NEON_AUTH_COOKIE_SECRET"), "Next service must declare its private Auth cookie secret");
+assert.ok(nextBlueprint.includes("generateValue: true"), "Render should generate the Next-only auth cookie secret");
+assert.ok(nextBlueprint.includes("autoDeployTrigger: off"), "Next service should avoid deploying before CI/security configuration is reviewed");
+assert.ok(nextBlueprint.includes("https://hendy-store.onrender.com"), "Next service must target the PHP Render service");
+
+assert.ok(hardenedBootstrap.includes("($jwtHeader['alg'] ?? '') !== 'EdDSA'"), "Neon JWT verifier must pin EdDSA");
+assert.ok(hardenedBootstrap.includes("hash_equals($expectedIssuer, (string)$claims->iss)"), "JWT issuer must exactly match the Neon Auth origin");
+assert.ok(hardenedBootstrap.includes("'follow_location' => 0"), "JWKS fetch must not follow cross-host redirects");
+
+assert.ok(nextBlueprint.includes("generateValue: true"), "Render should generate the Next-only auth cookie secret");
+
+const vanillaAuthUi = await readFile("js/custom.261126163157.js", "utf8");
+assert.ok(vanillaAuthUi.includes("Neon Auth chưa được cấu hình"), "Vanilla frontend must fail closed when customer Neon Auth is unavailable");
+assert.ok(!vanillaAuthUi.includes("call(mode,'POST',body)"), "Vanilla customer login must not use the Admin-only PHP login endpoint");
+
+const nextApiProxy = await readFile("apps/storefront-next/src/app/api.php/route.ts", "utf8");
+assert.ok(nextApiProxy.includes('"x-forwarded-for"'), "Next proxy must remove client-controlled forwarded IP");
+assert.ok(nextApiProxy.includes('"x-forwarded-host"'), "Next proxy must replace forwarded host from its own request origin");
+assert.ok(nextApiProxy.includes('headers.set("X-Forwarded-Host", request.nextUrl.host)'), "PHP proxy must set an explicit trusted frontend host");
