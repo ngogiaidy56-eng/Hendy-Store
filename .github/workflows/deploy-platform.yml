@@ -1,0 +1,118 @@
+name: Deploy HendyStore platform targets
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        type: choice
+        options:
+          - provision
+          - worker
+          - next
+          - pages
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hendystore-cloudflare-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-worker:
+    if: inputs.target == 'provision' || inputs.target == 'worker' || inputs.target == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Cloudflare token
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Add CLOUDFLARE_API_TOKEN as a GitHub Actions repository secret."; exit 1; }
+      - name: Install Worker tooling
+        working-directory: cloudflare/platform-worker
+        run: npm install --no-audit --no-fund
+      - name: Select Neon as the proxied origin storage provider
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: "918ff2f016938fc978ed23b96505b21e"
+          CF_DATABASE_PROVIDER: "origin"
+          CF_OBJECT_STORAGE_PROVIDER: "neon"
+        run: node scripts/provision-cloudflare-resources.mjs
+      - name: Upload optional protected health-probe secret
+        working-directory: cloudflare/platform-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: "918ff2f016938fc978ed23b96505b21e"
+          CF_PLATFORM_HEALTH_TOKEN: ${{ secrets.CF_PLATFORM_HEALTH_TOKEN }}
+        run: |
+          node ../../scripts/write-cloudflare-secrets.mjs /tmp/hendy-worker-secrets.json
+          if [ -f /tmp/hendy-worker-secrets.json ]; then
+            npx wrangler secret bulk /tmp/hendy-worker-secrets.json --config wrangler.toml
+            rm -f /tmp/hendy-worker-secrets.json
+          fi
+      - name: Deploy Platform API Worker
+        working-directory: cloudflare/platform-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: "918ff2f016938fc978ed23b96505b21e"
+        run: npx wrangler deploy --config wrangler.toml
+
+  deploy-next:
+    if: (inputs.target == 'next' || inputs.target == 'all') && vars.CF_ENABLE_NEXT_WORKER == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Cloudflare token
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Add CLOUDFLARE_API_TOKEN as a GitHub Actions repository secret."; exit 1; }
+      - name: Install Next.js and OpenNext dependencies
+        working-directory: apps/storefront-next
+        run: npm install --no-audit --no-fund
+      - name: Build Next.js for Cloudflare Workers
+        working-directory: apps/storefront-next
+        run: npm run cf:build
+      - name: Deploy Next.js SSR Worker
+        working-directory: apps/storefront-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: "918ff2f016938fc978ed23b96505b21e"
+        run: npm run cf:deploy
+
+  deploy-pages:
+    if: inputs.target == 'pages' || inputs.target == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Cloudflare token
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Add CLOUDFLARE_API_TOKEN as a GitHub Actions repository secret."; exit 1; }
+      - name: Ensure HendyStore Pages project exists
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: "918ff2f016938fc978ed23b96505b21e"
+          CF_PAGES_PROJECT_NAME: "hendystore-pages"
+          CF_PAGES_PRODUCTION_BRANCH: "main"
+        run: node scripts/ensure-cloudflare-pages-project.mjs
+      - name: Deploy HendyStore Pages proxy
+        working-directory: cloudflare/pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: "918ff2f016938fc978ed23b96505b21e"
+        run: npx --yes wrangler pages deploy public --project-name hendystore-pages --branch main

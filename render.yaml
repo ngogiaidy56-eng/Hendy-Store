@@ -3,7 +3,7 @@ services:
     name: hendy-store
     runtime: docker
     plan: free
-    autoDeploy: true
+    autoDeployTrigger: checksPass
     healthCheckPath: /api.php?action=health
     envVars:
       - key: PORT
@@ -13,7 +13,9 @@ services:
       - key: STORE_NAME
         value: Hendy Store
       - key: APP_URL
-        sync: false
+        value: auto
+      - key: APP_AUTO_DETECT_DOMAINS
+        value: "true"
       - key: APP_KEY
         generateValue: true
       - key: ADMIN_EMAIL
@@ -27,7 +29,9 @@ services:
       - key: NEON_AUTH_JWKS_URL
         sync: false
       - key: NEON_AUTH_PUBLIC_SIGNUP
-        value: "false"
+        value: "true"
+      - key: NEON_DATA_API_URL
+        value: https://ep-withered-sunset-bekyloue.apirest.c-9.us-east-2.aws.neon.tech/Hendy_Store/rest/v1
       - key: AWS_ACCESS_KEY_ID
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
@@ -62,3 +66,31 @@ services:
         value: "true"
       - key: MAX_UPLOAD_BYTES
         value: "209715200"
+      - key: OBJECT_STORAGE_PROVIDER
+        sync: false
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: OBJECT_STORAGE_ENDPOINT
+        sync: false
+      - key: OBJECT_STORAGE_REGION
+        sync: false
+      - key: OBJECT_STORAGE_BUCKET
+        sync: false
+      - key: OBJECT_STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: OBJECT_STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: OBJECT_STORAGE_SESSION_TOKEN
+        sync: false
+      - key: OBJECT_STORAGE_FORCE_PATH_STYLE
+        value: "true"
+      - key: OBJECT_STORAGE_LEGACY_NEON_READ_FALLBACK
+        value: "true"
+      - key: MAX_DIRECT_UPLOAD_BYTES
+        value: "681574400"
+      - key: VIRUSTOTAL_API_KEY
+        sync: false
+      - key: CODE_SIGNING_SERVICE_URL
+        sync: false
+      - key: CODE_SIGNING_SERVICE_TOKEN
+        sync: false

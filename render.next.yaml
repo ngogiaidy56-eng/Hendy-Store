@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: hendystore-next
+    runtime: docker
+    rootDir: apps/storefront-next
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    autoDeploy: false
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NODE_ENV
+        value: production
+      - key: HENDY_API_ORIGIN
+        value: https://hendystore.onrender.com
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: DEPLOY_TARGET
+        value: render

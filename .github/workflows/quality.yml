@@ -2,7 +2,7 @@ name: Hendy Store quality checks
 
 on:
   push:
-    branches: [main, feature/render-free-neon]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
@@ -20,8 +20,8 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: curl, fileinfo, mbstring, pdo_pgsql, pdo_sqlite
+          php-version: '8.4'
+          extensions: curl, fileinfo, mbstring, pdo_pgsql, pdo_mysql, pdo_sqlite
           coverage: none
 
       - name: Validate Composer manifest
@@ -40,6 +40,9 @@ jobs:
 
       - name: Run SQLite smoke test
         run: php tests/smoke.php
+
+      - name: Run Store Ecosystem schema smoke test
+        run: php tests/store_features_smoke.php
 
   frontend:
     name: Neon browser bundle and source tests
@@ -66,8 +69,73 @@ jobs:
         run: |
           node --check js/custom.261126163157.js
           node --check admin/admin.js
+          node --check features/storefront.js
+          node --check admin/security.js
+          node --check developer/console.js
+          node --check admin/store-features.js
+          node --check library/library.js
+          node --check admin/infrastructure.js
+          node --check scripts/provision-cloudflare-resources.mjs
+          node --check scripts/write-cloudflare-secrets.mjs
+          node --check scripts/ensure-cloudflare-pages-project.mjs
 
       - name: Ensure secrets are not committed
         run: |
           test ! -f .env
           test ! -f .env.local
+
+  platform-worker:
+    name: Cloudflare Worker adapters
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare/platform-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cloudflare/platform-worker/package.json
+      - name: Install Worker dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck Worker adapters
+        run: npm run typecheck
+
+  next-storefront:
+    name: Next.js storefront build and typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/storefront-next
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/storefront-next/package.json
+      - name: Install storefront dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Next.js application
+        run: npm run build
+      - name: Build OpenNext Cloudflare Worker artifact
+        run: npm run cf:build
+      - name: Typecheck Next.js application
+        run: npm run typecheck
+
+  container-build:
+    name: Render Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build production image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: hendy-store:ci

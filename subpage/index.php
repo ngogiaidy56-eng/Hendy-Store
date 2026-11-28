@@ -48,7 +48,7 @@ $schema=$product?[
 <title><?= $escape($title) ?> — Hendy Store</title><meta name="description" content="<?= $escape($description) ?>">
 <link rel="canonical" href="<?= $escape($canonical) ?>">
 <meta property="og:type" content="website"><meta property="og:title" content="<?= $escape($title) ?>"><meta property="og:description" content="<?= $escape($description) ?>"><meta property="og:image" content="<?= $escape($base.'/images/dummy.png') ?>">
-<link rel="stylesheet" href="../g/fonts.css"><link rel="stylesheet" href="../css/custom.261126163517.css">
+<link rel="stylesheet" href="../g/fonts.css"><link rel="stylesheet" href="../css/custom.261126163517.css"><link rel="stylesheet" href="../features/storefront.css">
 </head>
 <body>
 <header class="site-header">
@@ -70,7 +70,7 @@ $schema=$product?[
 </div>
 <div class="detail-actions">
 <?php if($downloadUrl!=='' && $product['price_type']!=='Paid'): ?>
-<a class="button button-primary" href="<?= $escape($downloadUrl) ?>" rel="nofollow">Tải xuống <span>↓</span></a>
+<a class="button button-primary" href="#storeEcosystem">Chọn bộ cài phù hợp <span>↓</span></a>
 <?php else: ?><button class="button button-soft" type="button" disabled>Chưa có liên kết tải</button><?php endif; ?>
 <small>Kiểm tra nguồn phát hành và tệp trước khi cài đặt.</small>
 </div>
@@ -86,7 +86,38 @@ $schema=$product?[
 </dl></aside>
 </div>
 <?php endif; ?>
+
+<div class="store-ecosystem" id="storeEcosystem" data-slug="<?= $escape($slug) ?>">
+<section class="store-feature-card">
+  <h2>Tải đúng phiên bản cho thiết bị</h2>
+  <div class="store-build-picker"><label class="store-device-label" for="storePlatform">Thiết bị / hệ điều hành</label><select id="storePlatform" aria-label="Chọn hệ điều hành"></select><a class="button button-primary" id="storeDownload" href="#" rel="nofollow">Đang kiểm tra bộ cài…</a></div>
+  <p class="store-muted" id="storeBuildMessage">Đang nhận diện thiết bị và kiểm tra bộ cài…</p>
+</section>
+<section class="store-feature-card"><h2>Ảnh chụp màn hình</h2><div id="storeScreenshots"><p class="store-muted">Đang tải ảnh…</p></div></section>
+<section class="store-feature-card"><h2>Video giới thiệu</h2><div class="store-video" id="storeVideo"><span class="store-muted">Đang tải video…</span></div></section>
+<section class="store-feature-card"><h2>Nhật ký thay đổi</h2><div id="storeChangelog"><p class="store-muted">Đang tải phiên bản…</p></div></section>
+<section class="store-feature-card"><h2>Kiểm tra tính toàn vẹn tệp</h2><div class="store-specs" id="storeIntegrity">Đang xác minh SHA-256…</div></section>
+<section class="store-feature-card"><h2>Ứng dụng tương tự</h2><div id="storeRelated" class="store-related-grid"><p class="store-muted">Đang tìm ứng dụng cùng danh mục…</p></div></section>
+<div class="detail-description">
+  <section class="store-feature-card"><h2>Cấu hình tối thiểu</h2><div class="store-specs" id="storeRequirements">Đang tải thông tin…</div></section>
+  <section class="store-feature-card"><h2>Quyền riêng tư ứng dụng</h2><div class="store-specs" id="storePrivacy">Đang tải thông tin…</div></section>
+</div>
+<section class="store-feature-card">
+  <h2>Đánh giá & phản hồi</h2>
+  <div id="storeReviewStats" class="store-review-stats"><strong>—</strong><span>Đang tải đánh giá…</span></div>
+  <div id="storeReviews" class="store-reviews"></div>
+  <form id="storeReviewForm" class="store-review-form">
+    <label>Điểm đánh giá
+      <select name="rating" required><option value="5">5 sao — Rất tốt</option><option value="4">4 sao — Tốt</option><option value="3">3 sao — Bình thường</option><option value="2">2 sao — Chưa tốt</option><option value="1">1 sao — Kém</option></select>
+    </label>
+    <label>Nhận xét<textarea name="review_text" minlength="5" maxlength="3000" required placeholder="Chia sẻ trải nghiệm thực tế của bạn…"></textarea></label>
+    <button class="button button-primary" type="submit">Gửi đánh giá</button><p class="store-muted" id="storeReviewMessage">Đánh giá sẽ được duyệt trước khi xuất hiện công khai.</p>
+  </form>
+</section>
+</div>
+
 </main>
 <footer class="site-footer"><div class="footer-bottom"><span>© <?= date('Y') ?> Hendy Store</span><a href="../legal-notice/">Thông tin pháp lý</a><a href="../privacy/">Quyền riêng tư</a></div></footer>
 <?php if($schema): ?><script type="application/ld+json"><?= json_encode($schema,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP) ?></script><?php endif; ?>
+<script src="../js/neon-client.bundle.js" defer></script><script src="../features/storefront.js" defer></script>
 </body></html>

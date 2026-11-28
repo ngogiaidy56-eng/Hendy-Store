@@ -3,9 +3,9 @@
   "description": "Hendy Store PHP marketplace runtime with Neon PostgreSQL and Object Storage.",
   "type": "project",
   "require": {
-    "php": "^8.3",
+    "php": "^8.4",
     "aws/aws-sdk-php": "^3.300",
-    "firebase/php-jwt": "^6.11"
+    "firebase/php-jwt": "^7.2.2"
   },
   "config": {
     "allow-plugins": {},
