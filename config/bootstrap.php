@@ -907,6 +907,7 @@ function neon_auth_jwks(bool $forceRefresh = false): ?array
         || strtolower((string)($jwksParts['scheme'] ?? '')) !== 'https'
         || empty($authParts['host']) || empty($jwksParts['host'])
         || strtolower((string)$authParts['host']) !== strtolower((string)$jwksParts['host'])
+        || (int)($authParts['port'] ?? 443) !== (int)($jwksParts['port'] ?? 443)
         || isset($jwksParts['user']) || isset($jwksParts['pass'])
         || isset($jwksParts['query']) || isset($jwksParts['fragment'])) {
         return null;
@@ -916,6 +917,8 @@ function neon_auth_jwks(bool $forceRefresh = false): ?array
         'http' => [
             'timeout' => 5,
             'ignore_errors' => true,
+            'follow_location' => 0,
+            'max_redirects' => 0,
             'header' => "Accept: application/json\r\n",
         ],
         'ssl' => [
@@ -924,7 +927,9 @@ function neon_auth_jwks(bool $forceRefresh = false): ?array
         ],
     ]);
     $body = @file_get_contents($jwksUrl, false, $context);
-    if (!is_string($body) || $body === '') return null;
+    $responseHeaders = $http_response_header ?? [];
+    $statusLine = (string)($responseHeaders[0] ?? '');
+    if (!preg_match('/\\s200\\s/', $statusLine) || !is_string($body) || $body === '') return null;
     $decoded = json_decode($body, true);
     if (!is_array($decoded) || !isset($decoded['keys']) || !is_array($decoded['keys'])) return null;
 

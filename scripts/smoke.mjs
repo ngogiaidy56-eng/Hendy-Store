@@ -277,3 +277,7 @@ assert.ok(apiSource.includes("'registrationEnabled' => false"), "Legacy PHP regi
 const nextBlueprint = await readFile("render.next.yaml", "utf8");
 assert.ok(nextBlueprint.includes("NEON_AUTH_COOKIE_SECRET"), "Next service must declare its private Auth cookie secret");
 assert.ok(nextBlueprint.includes("https://hendy-store.onrender.com"), "Next service must target the PHP Render service");
+
+assert.ok(hardenedBootstrap.includes("($jwtHeader['alg'] ?? '') !== 'EdDSA'"), "Neon JWT verifier must pin EdDSA");
+assert.ok(hardenedBootstrap.includes("hash_equals($expectedIssuer, (string)$claims->iss)"), "JWT issuer must exactly match the Neon Auth origin");
+assert.ok(hardenedBootstrap.includes("'follow_location' => 0"), "JWKS fetch must not follow cross-host redirects");
