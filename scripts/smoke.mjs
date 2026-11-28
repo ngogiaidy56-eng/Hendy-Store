@@ -285,3 +285,7 @@ assert.ok(hardenedBootstrap.includes("hash_equals($expectedIssuer, (string)$clai
 assert.ok(hardenedBootstrap.includes("'follow_location' => 0"), "JWKS fetch must not follow cross-host redirects");
 
 assert.ok(nextBlueprint.includes("generateValue: true"), "Render should generate the Next-only auth cookie secret");
+
+const vanillaAuthUi = await readFile("js/custom.261126163157.js", "utf8");
+assert.ok(vanillaAuthUi.includes("Neon Auth chưa được cấu hình"), "Vanilla frontend must fail closed when customer Neon Auth is unavailable");
+assert.ok(!vanillaAuthUi.includes("call(mode,'POST',body)"), "Vanilla customer login must not use the Admin-only PHP login endpoint");

@@ -219,9 +219,7 @@ function bindEvents() {
           throw new Error('Đăng nhập Neon Auth thành công nhưng API chưa xác thực được JWT. Kiểm tra NEON_AUTH_JWKS_URL, NEON_AUTH_BASE_URL và issuer của Neon Auth.');
         }
       } else {
-        const result=await call(mode,'POST',body);
-        state.user=result.data.user;
-        state.csrf=result.data.csrfToken||state.csrf;
+        throw new Error('Neon Auth chưa được cấu hình. Khách hàng không thể đăng nhập bằng PHP session quản trị.');
       }
       renderAccount();
       $('#authDialog').close();notify(mode==='login'?'Đăng nhập thành công.':'Tài khoản đã được tạo.');
