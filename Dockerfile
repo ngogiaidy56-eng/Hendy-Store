@@ -15,11 +15,13 @@ COPY composer.json ./
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
 # Small PHP/Apache runtime suitable for a Render Free Web Service.
-FROM php:8.3-apache
+FROM php:8.4-apache
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq-dev libonig-dev libcurl4-openssl-dev \
-    && docker-php-ext-install pdo_pgsql mbstring curl opcache \
+    && apt-get install -y --no-install-recommends libpq-dev libonig-dev libcurl4-openssl-dev libsqlite3-dev \
+    && docker-php-ext-install pdo_pgsql pdo_mysql pdo_sqlite mbstring curl opcache \
     && a2enmod headers rewrite deflate expires \
+    && printf '%s\n' 'ServerName localhost' > /etc/apache2/conf-available/servername.conf \
+    && a2enconf servername \
     && printf '%s\n' \
       'upload_max_filesize=210M' \
       'post_max_size=212M' \

@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hendystore-next",
+  "account_id": "918ff2f016938fc978ed23b96505b21e",
+  "workers_dev": true,
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "HENDY_API_ORIGIN": "https://hendystore.onrender.com",
+    "NEXT_PUBLIC_SITE_URL": "https://hendystore.onrender.com",
+    "PLATFORM_MODE": "cloudflare-workers"
+  },
+  "observability": { "enabled": true }
+}

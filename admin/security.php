@@ -1,0 +1,22 @@
+<?php
+declare(strict_types=1);
+header('Cache-Control: no-store, private');
+?><!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Kiểm duyệt & Bảo mật — Hendy Store</title>
+<link rel="stylesheet" href="../g/fonts.css"><link rel="stylesheet" href="../css/custom.261126163517.css">
+<script src="../js/neon-client.bundle.js" defer></script><script src="security.js" defer></script>
+<style>
+.sec-shell{max-width:1180px;margin:0 auto;padding:38px 24px 80px}.sec-hero{padding:32px;border-radius:22px;background:linear-gradient(130deg,#172442,#303d70);color:white}.sec-hero h1{margin:8px 0;font-size:clamp(28px,4vw,40px)}.sec-hero p{color:#dce2f5;line-height:1.65;margin:0}.sec-kicker{font-size:11px;font-weight:800;letter-spacing:.16em;color:#aab5ff}.sec-section{margin-top:24px;background:#fff;border:1px solid #e6eaf1;border-radius:18px;padding:22px}.sec-section h2{margin:4px 0 12px;font-size:22px}.sec-list{display:grid;gap:12px}.sec-card{padding:16px;border:1px solid #e6eaf1;border-radius:13px;display:grid;gap:10px}.sec-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.sec-card strong{color:#1c2940}.sec-meta{color:#657187;font-size:13px;line-height:1.65}.sec-badge{font-size:11px;font-weight:800;border-radius:20px;padding:5px 9px;background:#f2f3f7;color:#566176;white-space:nowrap}.sec-badge.clean,.sec-badge.approved{background:#e7f7ec;color:#166a3e}.sec-badge.pending{background:#fff4df;color:#896116}.sec-badge.malicious,.sec-badge.rejected,.sec-badge.integrity_error{background:#ffedeb;color:#a3332a}.sec-actions{display:flex;gap:8px;flex-wrap:wrap}.sec-btn{border:0;border-radius:9px;background:#5969dc;color:white;padding:9px 13px;font-weight:750;cursor:pointer}.sec-btn.alt{background:#eef1fa;color:#3e4a73}.sec-btn.danger{background:#fff0ef;color:#a5362e}.sec-note{width:100%;padding:10px 12px;border:1px solid #e1e6ef;border-radius:9px}.sec-state{padding:14px;border-radius:11px;background:#f4f6fb;color:#607087;line-height:1.6}.sec-state.error{background:#fff0ef;color:#a5362e}
+@media(max-width:720px){.sec-shell{padding:20px 14px 50px}.sec-top{display:block}.sec-top .sec-badge{display:inline-flex;margin-top:7px}}
+</style></head>
+<body>
+<header class="site-header"><a class="brand" href="../"><span class="brand-mark"><i></i><i></i><i></i><i></i></span><span class="brand-name">Hendy <b>Store</b></span></a><nav class="main-nav"><a class="nav-link" href="../">Cửa hàng</a><a class="nav-link" href="./">Quản trị</a><a class="nav-link active" href="security.php">Kiểm duyệt & Bảo mật</a></nav><div class="header-actions"><a class="account-button" href="./">← Admin</a></div></header>
+<main class="sec-shell">
+<section class="sec-hero"><span class="sec-kicker">TRUST · SAFETY · ADMIN</span><h1>Kiểm duyệt & Bảo mật</h1><p>Chỉ ứng dụng đã vượt qua kiểm tra toàn vẹn, quét mã độc và xét duyệt thủ công mới được xuất bản ra Storefront. Với upload presigned, hệ thống yêu cầu chờ 6 phút để URL ghi hết hạn trước khi duyệt.</p></section>
+<div id="securityLogin" class="sec-section" hidden><h2>Yêu cầu quyền quản trị</h2><p>Vui lòng đăng nhập từ Admin Console trước khi quản lý hàng chờ.</p><a class="button button-primary" href="./">Đến trang đăng nhập Admin</a></div>
+<section class="sec-section"><span class="sec-kicker">DEVELOPER REVIEW</span><h2>Hồ sơ nhà phát triển chờ duyệt</h2><div id="developerQueue" class="sec-list"><div class="sec-state">Đang tải hàng chờ…</div></div></section>
+<section class="sec-section"><span class="sec-kicker">RELEASE REVIEW</span><h2>Ứng dụng chờ xuất bản</h2><div id="releaseQueue" class="sec-list"><div class="sec-state">Đang tải hàng chờ…</div></div></section>
+<section class="sec-section"><span class="sec-kicker">AUDIT & POLICY</span><h2>Điều kiện xuất bản</h2><div class="sec-state">1. Gói phải tồn tại trong private object storage. 2. SHA-256 do server tính và lưu. 3. Kết quả VirusTotal phải CLEAN. 4. Quản trị viên duyệt thủ công. 5. Không hiển thị package URL, JWT, khóa API hoặc chứng chỉ ký số trong dữ liệu công khai.</div></section>
+</main><div class="toast" id="toast" role="status"></div></body></html>

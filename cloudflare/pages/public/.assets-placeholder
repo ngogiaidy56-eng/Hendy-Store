@@ -1,0 +1,1 @@
+Cloudflare Pages serves requests through the Advanced Mode Worker and proxies dynamic routes to the PHP origin.

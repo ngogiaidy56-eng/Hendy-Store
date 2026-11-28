@@ -11,7 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "latest",
     "@neon/realtime": "latest",
-    "@neondatabase/auth": "latest",
+    "@neon/auth": "latest",
     "pg": "latest"
   },
   "devDependencies": {

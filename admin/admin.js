@@ -4,9 +4,9 @@
   let csrf = '';
   let products = [];
   let editingId = null;
-  const apiUrl = new URL('../api.php', window.location.href);
+  const apiUrl = new URL('/api.php', window.location.origin);
 
-  async function call(action, method = 'GET', body = null) {
+  async function call(action, method = 'GET', body = null, retryCsrf = true) {
     const url = new URL(apiUrl);
     url.searchParams.set('action', action);
     const headers = { Accept: 'application/json' };
@@ -22,11 +22,17 @@
     });
     let result;
     try { result = await response.json(); } catch { throw new Error('Máy chủ trả về dữ liệu không hợp lệ.'); }
+    if (response.status === 419 && method !== 'GET' && retryCsrf) {
+      const refreshed = await call('bootstrap', 'GET', null, false);
+      csrf = refreshed.data?.csrfToken || '';
+      return call(action, method, body, false);
+    }
     if (!response.ok || !result.ok) throw new Error(result.error || 'Yêu cầu thất bại.');
+    if (result.data?.csrfToken) csrf = result.data.csrfToken;
     return result;
   }
 
-  async function upload(kind, file) {
+  async function upload(kind, file, retryCsrf = true) {
     const url = new URL(apiUrl);
     url.searchParams.set('action', 'admin_upload');
     const data = new FormData();
@@ -40,6 +46,11 @@
     });
     let result;
     try { result = await response.json(); } catch { throw new Error('Máy chủ trả về dữ liệu không hợp lệ.'); }
+    if (response.status === 419 && retryCsrf) {
+      const refreshed = await call('bootstrap', 'GET', null, false);
+      csrf = refreshed.data?.csrfToken || '';
+      return upload(kind, file, false);
+    }
     if (!response.ok || !result.ok) throw new Error(result.error || 'Không thể tải tệp lên.');
     return result.data;
   }

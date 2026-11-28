@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS products (
   version VARCHAR(40) NOT NULL DEFAULT '1.0.0',
   platform VARCHAR(180) NOT NULL DEFAULT 'Windows, Android, Web',
   price_type VARCHAR(30) NOT NULL DEFAULT 'Free',
+  price_amount_vnd BIGINT NOT NULL DEFAULT 0 CHECK (price_amount_vnd >= 0),
   icon VARCHAR(500) NOT NULL,
   cover VARCHAR(500) NOT NULL,
   screenshots_json TEXT NOT NULL DEFAULT '[]',

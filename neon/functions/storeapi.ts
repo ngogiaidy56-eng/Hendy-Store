@@ -28,20 +28,31 @@ const storage = new S3Client({
   forcePathStyle: (process.env.NEON_STORAGE_FORCE_PATH_STYLE || "true").toLowerCase() !== "false",
 });
 
-const headersFor = (_origin: string | null): HeadersInit => ({
-  // The only browser-facing Function routes return the public catalogue query
-  // and health metadata. They contain no user-specific or secret data.
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Cache-Control": "no-store",
-  "Content-Type": "application/json; charset=utf-8",
-});
+const allowedOrigins = new Set(
+  (process.env.APP_ALLOWED_ORIGINS || "https://hendystore.onrender.com,https://hendy-store.onrender.com,https://hendystore-pages.pages.dev")
+    .split(",")
+    .map((value) => {
+      try { return new URL(value.trim()).origin; } catch { return ""; }
+    })
+    .filter(Boolean),
+);
+
+const headersFor = (origin: string | null): HeadersInit => {
+  const acceptedOrigin = origin && allowedOrigins.has(origin) ? origin : null;
+  return {
+    ...(acceptedOrigin ? { "Access-Control-Allow-Origin": acceptedOrigin } : {}),
+    "Vary": "Origin",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json; charset=utf-8",
+  };
+};
 
 async function sealCatalog() {
   return realtime.seal({
     query: rawSql(
-      'SELECT id, slug, title, developer, category, short_description AS "shortDescription", version, platform, price_type AS "priceType", icon, cover, downloads, rating, featured FROM products WHERE status = $1 ORDER BY featured DESC, downloads DESC, rating DESC LIMIT 100',
+      'SELECT id, slug, title, developer, category, short_description AS "shortDescription", version, platform, price_type AS "priceType", price_amount_vnd AS "priceAmountVnd", icon, cover, downloads, rating, featured FROM products WHERE status = $1 ORDER BY featured DESC, downloads DESC, rating DESC LIMIT 100',
       ["published"],
     ),
   });
@@ -105,7 +116,7 @@ async function checkHealth() {
   }
 
   return {
-    ok: Object.values(checks).every(Boolean),
+    ok: checks.postgres && checks.objectStorage && checks.auth && checks.realtime,\n    warnings: checks.aiGateway ? [] : ["aiGateway_unavailable_or_credits_not_configured"],
     service: "hendy-store-neon",
     region: process.env.AWS_REGION || "us-east-2",
     checks,
