@@ -289,3 +289,8 @@ assert.ok(nextBlueprint.includes("generateValue: true"), "Render should generate
 const vanillaAuthUi = await readFile("js/custom.261126163157.js", "utf8");
 assert.ok(vanillaAuthUi.includes("Neon Auth chưa được cấu hình"), "Vanilla frontend must fail closed when customer Neon Auth is unavailable");
 assert.ok(!vanillaAuthUi.includes("call(mode,'POST',body)"), "Vanilla customer login must not use the Admin-only PHP login endpoint");
+
+const nextApiProxy = await readFile("apps/storefront-next/src/app/api.php/route.ts", "utf8");
+assert.ok(nextApiProxy.includes('"x-forwarded-for"'), "Next proxy must remove client-controlled forwarded IP");
+assert.ok(nextApiProxy.includes('"x-forwarded-host"'), "Next proxy must replace forwarded host from its own request origin");
+assert.ok(nextApiProxy.includes('headers.set("X-Forwarded-Host", request.nextUrl.host)'), "PHP proxy must set an explicit trusted frontend host");
