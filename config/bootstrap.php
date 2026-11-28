@@ -242,11 +242,26 @@ function storage_root(): string {
 }
 function store_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
-    ini_set('session.use_strict_mode','1'); ini_set('session.use_only_cookies','1'); ini_set('session.use_trans_sid','0');
-    $basePath = (string)(parse_url(app_base_url(),PHP_URL_PATH) ?: '/');
-    $path = rtrim($basePath,'/') . '/'; if ($path === '') $path = '/';
+    $secureCookie = env_value('APP_ENV', 'development') === 'production'
+        || request_is_https()
+        || env_bool('FORCE_SECURE_COOKIES');
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.use_trans_sid', '0');
+    ini_set('session.cookie_httponly', '1');
+    ini_set('session.cookie_secure', $secureCookie ? '1' : '0');
+    ini_set('session.cookie_samesite', 'Lax');
+    $basePath = (string)(parse_url(app_base_url(), PHP_URL_PATH) ?: '/');
+    $path = rtrim($basePath, '/') . '/';
+    if ($path === '') $path = '/';
     session_name('hendy_store_session');
-    session_set_cookie_params(['lifetime'=>0,'path'=>$path,'secure'=>request_is_https() || env_bool('FORCE_SECURE_COOKIES'),'httponly'=>true,'samesite'=>'Lax']);
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => $path,
+        'secure' => $secureCookie,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     $db = store_db();
     if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
         session_set_save_handler(new NeonPostgresSessionHandler($db), true);
@@ -254,15 +269,81 @@ function store_session(): void {
     session_start();
     if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
-function csrf_token(): string {
-    if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    return (string)$_SESSION['csrf_token'];
+function csrf_token(): string
+{
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return (string) $_SESSION['csrf_token'];
 }
-function require_csrf(): void {
+
+/** Normalize an Origin or Referer value to an exact scheme/host/port origin. */
+function normalize_security_origin(string $value): ?string
+{
+    $parts = parse_url(trim($value));
+    if (!is_array($parts)) return null;
+    $scheme = strtolower((string)($parts['scheme'] ?? ''));
+    $host = (string)($parts['host'] ?? '');
+    if (!in_array($scheme, ['https', 'http'], true) || $host === ''
+        || isset($parts['user']) || isset($parts['pass'])
+        || isset($parts['query']) || isset($parts['fragment'])
+        || !in_array((string)($parts['path'] ?? ''), ['', '/'], true)) {
+        return null;
+    }
+    if ($scheme !== 'https' && env_value('APP_ENV', 'development') === 'production') return null;
+    $normalizedHost = normalize_request_host($host . (isset($parts['port']) ? ':' . (int)$parts['port'] : ''));
+    if ($normalizedHost === null) return null;
+    return $scheme . '://' . strtolower($normalizedHost);
+}
+
+function app_security_origin_allowed(string $origin): bool
+{
+    $normalized = normalize_security_origin($origin);
+    if ($normalized === null) return false;
+
+    $baseOrigin = normalize_security_origin(app_base_url());
+    if ($baseOrigin !== null && hash_equals($baseOrigin, $normalized)) return true;
+
+    foreach (explode(',', (string)env_value('APP_ALLOWED_ORIGINS', '')) as $candidate) {
+        $candidate = trim($candidate);
+        if ($candidate === '') continue;
+        $allowed = normalize_security_origin($candidate);
+        if ($allowed !== null && hash_equals($allowed, $normalized)) return true;
+    }
+    return false;
+}
+
+function require_csrf(): void
+{
+    $fetchSite = strtolower(trim((string)($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '')));
+    if ($fetchSite === 'cross-site') {
+        json_response(['ok' => false, 'error' => 'Yêu cầu từ nguồn không được phép.'], 403);
+    }
+
+    $origin = trim((string)($_SERVER['HTTP_ORIGIN'] ?? ''));
+    if ($origin === '') {
+        $referer = trim((string)($_SERVER['HTTP_REFERER'] ?? ''));
+        if ($referer !== '') {
+            $parts = parse_url($referer);
+            if (is_array($parts) && isset($parts['scheme'], $parts['host'])) {
+                $origin = (string)$parts['scheme'] . '://' . (string)$parts['host']
+                    . (isset($parts['port']) ? ':' . (int)$parts['port'] : '');
+            } else {
+                json_response(['ok' => false, 'error' => 'Nguồn yêu cầu không hợp lệ.'], 403);
+            }
+        }
+    }
+    if ($origin !== '' && !app_security_origin_allowed($origin)) {
+        json_response(['ok' => false, 'error' => 'Nguồn yêu cầu không được phép.'], 403);
+    }
+
     $sent = (string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
     $known = (string)($_SESSION['csrf_token'] ?? '');
-    if ($sent === '' || $known === '' || !hash_equals($known,$sent)) json_response(['ok'=>false,'error'=>'Phiên bảo mật đã hết hạn. Hãy tải lại trang.'],419);
+    if ($sent === '' || $known === '' || !hash_equals($known, $sent)) {
+        json_response(['ok' => false, 'error' => 'Phiên bảo mật đã hết hạn. Hãy tải lại trang.'], 419);
+    }
 }
+
 function database_url_to_pdo(string $url): array
 {
     $parts = parse_url($url);
@@ -787,96 +868,172 @@ function neon_storage_get(string $key): \Aws\Result
     }
 }
 
-function neon_auth_bearer_token(): ?string
+function neon_auth_authorization_header(): string
 {
-    $header = (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    $header = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
     if ($header === '' && function_exists('getallheaders')) {
-        $headers = getallheaders();
-        if (is_array($headers)) {
-            foreach ($headers as $name => $value) {
-                if (strtolower((string)$name) === 'authorization') {
-                    $header = (string)$value;
-                    break;
-                }
+        foreach ((array)getallheaders() as $name => $value) {
+            if (strtolower((string)$name) === 'authorization') {
+                $header = (string)$value;
+                break;
             }
         }
     }
-    if (preg_match('/^Bearer\s+([A-Za-z0-9._~-]+)$/i', trim($header), $matches)) return $matches[1];
-    return null;
+    return trim($header);
+}
+
+function neon_auth_bearer_token(): ?string
+{
+    $header = neon_auth_authorization_header();
+    return preg_match('/^Bearer\s+([A-Za-z0-9._~-]+)$/i', $header, $matches) === 1
+        ? $matches[1]
+        : null;
+}
+
+function neon_auth_jwks(bool $forceRefresh = false): ?array
+{
+    static $keys = null;
+    static $loadedAt = 0;
+    if (!$forceRefresh && is_array($keys) && (time() - $loadedAt) < 300) {
+        return $keys;
+    }
+
+    $authBase = trim((string)env_value('NEON_AUTH_BASE_URL', ''));
+    $jwksUrl = trim((string)env_value('NEON_AUTH_JWKS_URL', ''));
+    $authParts = parse_url($authBase);
+    $jwksParts = parse_url($jwksUrl);
+    if (!is_array($authParts) || !is_array($jwksParts)
+        || strtolower((string)($authParts['scheme'] ?? '')) !== 'https'
+        || strtolower((string)($jwksParts['scheme'] ?? '')) !== 'https'
+        || empty($authParts['host']) || empty($jwksParts['host'])
+        || strtolower((string)$authParts['host']) !== strtolower((string)$jwksParts['host'])
+        || isset($jwksParts['user']) || isset($jwksParts['pass'])
+        || isset($jwksParts['query']) || isset($jwksParts['fragment'])) {
+        return null;
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 5,
+            'ignore_errors' => true,
+            'header' => "Accept: application/json\r\n",
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ],
+    ]);
+    $body = @file_get_contents($jwksUrl, false, $context);
+    if (!is_string($body) || $body === '') return null;
+    $decoded = json_decode($body, true);
+    if (!is_array($decoded) || !isset($decoded['keys']) || !is_array($decoded['keys'])) return null;
+
+    try {
+        $parsed = \Firebase\JWT\JWK::parseKeySet($decoded);
+        if (!is_array($parsed) || $parsed === []) return null;
+        $keys = $parsed;
+        $loadedAt = time();
+        return $keys;
+    } catch (Throwable $error) {
+        return null;
+    }
 }
 
 function neon_auth_claims(): ?object
 {
-    static $jwks = null;
-    static $jwksLoadedAt = 0;
     $token = neon_auth_bearer_token();
-    $jwksUrl = env_value('NEON_AUTH_JWKS_URL');
-    if ($token === null || $jwksUrl === null || !class_exists(\Firebase\JWT\JWT::class)) return null;
-
-    if ($jwks === null || (time() - $jwksLoadedAt) > 300) {
-        $context = stream_context_create(['http' => ['timeout' => 5, 'ignore_errors' => true, 'header' => "Accept: application/json\r\n"]]);
-        $body = @file_get_contents($jwksUrl, false, $context);
-        if (!is_string($body) || $body === '') return null;
-        $decoded = json_decode($body, true);
-        if (!is_array($decoded) || !isset($decoded['keys']) || !is_array($decoded['keys'])) return null;
-        $jwks = \Firebase\JWT\JWK::parseKeySet($decoded);
-        $jwksLoadedAt = time();
-    }
-    try {
-        $claims = \Firebase\JWT\JWT::decode($token, $jwks);
-        if (!isset($claims->sub, $claims->exp) || (int) $claims->exp <= time()) return null;
-        $authBase = rtrim((string) env_value('NEON_AUTH_BASE_URL', ''), '/');
-        $allowedIssuers = [];
-        if ($authBase !== '') {
-            $allowedIssuers[] = $authBase;
-            $scheme = (string) parse_url($authBase, PHP_URL_SCHEME);
-            $host = (string) parse_url($authBase, PHP_URL_HOST);
-            $port = parse_url($authBase, PHP_URL_PORT);
-            if ($scheme !== '' && $host !== '') {
-                $allowedIssuers[] = $scheme . '://' . $host . ($port ? ':' . $port : '');
-            }
-        }
-        $allowedIssuers = array_values(array_unique(array_map(static fn($value) => rtrim((string)$value, '/'), $allowedIssuers)));
-        if (isset($claims->iss) && $allowedIssuers !== [] && !in_array(rtrim((string)$claims->iss, '/'), $allowedIssuers, true)) return null;
-        if (isset($claims->aud) && $allowedIssuers !== []) {
-            $audiences = is_array($claims->aud) ? $claims->aud : [(string)$claims->aud];
-            $audiences = array_map(static fn($value) => rtrim((string)$value, '/'), $audiences);
-            if (array_intersect($audiences, $allowedIssuers) === []) return null;
-        }
-        return $claims;
-    } catch (Throwable $error) {
+    if ($token === null || !class_exists(\Firebase\JWT\JWT::class)
+        || !class_exists(\Firebase\JWT\JWK::class)) {
         return null;
     }
+
+    $authBase = rtrim((string)env_value('NEON_AUTH_BASE_URL', ''), '/');
+    $baseParts = parse_url($authBase);
+    if (!is_array($baseParts) || strtolower((string)($baseParts['scheme'] ?? '')) !== 'https'
+        || empty($baseParts['host'])) {
+        return null;
+    }
+    $allowedIssuers = array_values(array_unique([
+        $authBase,
+        strtolower((string)$baseParts['scheme']) . '://' . strtolower((string)$baseParts['host'])
+            . (isset($baseParts['port']) ? ':' . (int)$baseParts['port'] : ''),
+    ]));
+
+    \Firebase\JWT\JWT::$leeway = 5;
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        $keySet = neon_auth_jwks($attempt === 1);
+        if ($keySet === null) return null;
+        try {
+            $claims = \Firebase\JWT\JWT::decode($token, $keySet);
+            if (!isset($claims->sub, $claims->exp, $claims->iss)
+                || trim((string)$claims->sub) === ''
+                || (int)$claims->exp <= time()
+                || !in_array(rtrim((string)$claims->iss, '/'), $allowedIssuers, true)) {
+                return null;
+            }
+            if (isset($claims->iat) && (int)$claims->iat > time() + 60) return null;
+            $expectedAudience = trim((string)env_value('NEON_AUTH_AUDIENCE', ''));
+            if ($expectedAudience !== '') {
+                $audiences = is_array($claims->aud ?? null)
+                    ? $claims->aud
+                    : [(string)($claims->aud ?? '')];
+                if (!in_array($expectedAudience, array_map('strval', $audiences), true)) return null;
+            }
+            return $claims;
+        } catch (Throwable $error) {
+            if ($attempt === 1) return null;
+            // A fresh key set handles Neon Auth signing-key rotation.
+        }
+    }
+    return null;
 }
 
 function neon_auth_user(PDO $db): ?array
 {
     $claims = neon_auth_claims();
     if (!$claims) return null;
-    $subject = (string) $claims->sub;
-    $email = strtolower(trim((string) ($claims->email ?? '')));
-    $name = trim((string) ($claims->name ?? $claims->email ?? 'Neon User'));
+
+    $subject = trim((string)$claims->sub);
+    $email = strtolower(trim((string)($claims->email ?? '')));
+    $name = trim((string)($claims->name ?? $email));
+    $emailVerified = $claims->email_verified ?? $claims->emailVerified ?? null;
+    $verified = in_array($emailVerified, [true, 1, 'true'], true);
+
     if ($subject === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return null;
-    $verifiedClaim = $claims->email_verified ?? $claims->emailVerified ?? null;
-    if ($verifiedClaim !== null && !in_array($verifiedClaim, [true, 1, 'true'], true)) return null;
 
-    $stmt = $db->prepare('SELECT id,name,email,role,neon_auth_subject FROM users WHERE neon_auth_subject = :subject OR LOWER(email) = :email LIMIT 1');
-    $stmt->execute([':subject' => $subject, ':email' => $email]);
-    $account = $stmt->fetch();
+    // Stable subject lookup always wins. A Neon identity may represent a customer only.
+    $bySubject = $db->prepare('SELECT id,name,email,role,neon_auth_subject FROM users WHERE neon_auth_subject = :subject LIMIT 1');
+    $bySubject->execute([':subject' => $subject]);
+    $account = $bySubject->fetch();
     if ($account) {
-        $linkedSubject = (string) ($account['neon_auth_subject'] ?? '');
-        // Do not let an unlinked social identity inherit an existing local Admin role.
-        if (($account['role'] ?? '') === 'admin' && $linkedSubject === '') return null;
-        if ($linkedSubject !== '' && !hash_equals($linkedSubject, $subject)) return null;
-
-        if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
-            $update = $db->prepare('UPDATE users SET neon_auth_subject = COALESCE(neon_auth_subject,:subject) WHERE id = :id');
-            $update->execute([':subject' => $subject, ':id' => $account['id']]);
-        }
+        if (($account['role'] ?? '') !== 'customer') return null;
         return public_user($account);
     }
 
-    $passwordHash = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
+    // Email-based linking and first-time provisioning require an explicit verified claim.
+    if (!$verified) return null;
+
+    $byEmail = $db->prepare('SELECT id,name,email,role,neon_auth_subject FROM users WHERE LOWER(email) = :email LIMIT 1');
+    $byEmail->execute([':email' => $email]);
+    $account = $byEmail->fetch();
+    if ($account) {
+        $linkedSubject = trim((string)($account['neon_auth_subject'] ?? ''));
+        if (($account['role'] ?? '') !== 'customer' || ($linkedSubject !== '' && !hash_equals($linkedSubject, $subject))) {
+            return null;
+        }
+        if ($linkedSubject === '') {
+            $link = $db->prepare('UPDATE users SET neon_auth_subject = :subject WHERE id = :id AND (neon_auth_subject IS NULL OR neon_auth_subject = :empty)');
+            try {
+                $link->execute([':subject' => $subject, ':id' => (int)$account['id'], ':empty' => '']);
+            } catch (PDOException $error) {
+                // A concurrent link may have won; re-read by subject below.
+            }
+        }
+        $bySubject->execute([':subject' => $subject]);
+        $linked = $bySubject->fetch();
+        return $linked && ($linked['role'] ?? '') === 'customer' ? public_user($linked) : null;
+    }
+
     $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
     $insertSql = $driver === 'pgsql'
         ? 'INSERT INTO users(name,email,password_hash,role,neon_auth_subject,created_at) VALUES(:name,:email,:hash,:role,:subject,:created) ON CONFLICT(email) DO NOTHING'
@@ -884,17 +1041,22 @@ function neon_auth_user(PDO $db): ?array
             ? 'INSERT OR IGNORE INTO users(name,email,password_hash,role,neon_auth_subject,created_at) VALUES(:name,:email,:hash,:role,:subject,:created)'
             : 'INSERT IGNORE INTO users(name,email,password_hash,role,neon_auth_subject,created_at) VALUES(:name,:email,:hash,:role,:subject,:created)');
     $insert = $db->prepare($insertSql);
-    $insert->execute([
-        ':name' => mb_substr_safe($name, 80),
-        ':email' => $email,
-        ':hash' => $passwordHash,
-        ':role' => 'customer',
-        ':subject' => $subject,
-        ':created' => date('Y-m-d H:i:s'),
-    ]);
-    $stmt->execute([':subject' => $subject, ':email' => $email]);
-    $account = $stmt->fetch();
-    return $account ? public_user($account) : null;
+    try {
+        $insert->execute([
+            ':name' => mb_substr_safe($name !== '' ? $name : $email, 80),
+            ':email' => $email,
+            ':hash' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
+            ':role' => 'customer',
+            ':subject' => $subject,
+            ':created' => date('Y-m-d H:i:s'),
+        ]);
+    } catch (PDOException $error) {
+        // Do not let a racing insert turn into an identity takeover.
+    }
+
+    $bySubject->execute([':subject' => $subject]);
+    $created = $bySubject->fetch();
+    return $created && ($created['role'] ?? '') === 'customer' ? public_user($created) : null;
 }
 
 function neon_ai_completion(string $systemPrompt, string $userPrompt, int $maxTokens = 700): string
@@ -1023,22 +1185,43 @@ function ensure_environment_admin(PDO $db): void {
     }
 }
 function public_user(array $user): array { return ['id'=>(int)$user['id'],'name'=>$user['name'],'email'=>$user['email'],'role'=>$user['role']]; }
-function current_user(PDO $db): ?array {
-    $id=(int)($_SESSION['user_id']??0);
-    if ($id > 0) {
-        $q=$db->prepare('SELECT id,name,email,role FROM users WHERE id=:id LIMIT 1');
-        $q->execute([':id'=>$id]);
-        $user=$q->fetch();
-        if ($user) return public_user($user);
-        unset($_SESSION['user_id']);
+function php_session_user(PDO $db): ?array
+{
+    $id = (int)($_SESSION['user_id'] ?? 0);
+    if ($id < 1) return null;
+    $stmt = $db->prepare('SELECT id,name,email,role FROM users WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $id]);
+    $user = $stmt->fetch();
+    if (!$user) {
+        unset($_SESSION['user_id'], $_SESSION['auth_mode']);
+        return null;
     }
-    return neon_auth_user($db);
+    return public_user($user);
 }
-function require_admin(PDO $db): array {
-    $user=current_user($db);
-    if (!$user || $user['role']!=='admin') json_response(['ok'=>false,'error'=>'Bạn cần đăng nhập bằng tài khoản quản trị.'],403);
+
+function current_user(PDO $db): ?array
+{
+    $authorization = neon_auth_authorization_header();
+    if (preg_match('/^Bearer\b/i', $authorization)) {
+        // A malformed or invalid Bearer token must not fall back to another cookie identity.
+        if (neon_auth_bearer_token() === null) return null;
+        return neon_auth_user($db);
+    }
+    return php_session_user($db);
+}
+
+function require_admin(PDO $db): array
+{
+    // The Admin console intentionally uses a separate PHP email/password session.
+    // A Neon Auth customer token or a matching Google email can never grant Admin.
+    $user = php_session_user($db);
+    if (!$user || ($user['role'] ?? '') !== 'admin'
+        || ($_SESSION['auth_mode'] ?? '') !== 'admin_password') {
+        json_response(['ok' => false, 'error' => 'Bạn cần đăng nhập bằng tài khoản quản trị riêng.'], 403);
+    }
     return $user;
 }
+
 function request_ip(): string {
     if (env_bool('TRUST_PROXY_HEADERS')) {
         $ip=trim(explode(',',(string)($_SERVER['HTTP_X_FORWARDED_FOR']??''))[0]);
