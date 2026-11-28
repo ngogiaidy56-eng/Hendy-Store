@@ -947,17 +947,33 @@ function neon_auth_claims(): ?object
         return null;
     }
 
+    // Neon Managed Auth issues EdDSA JWTs. Reject unsupported algorithms before
+    // key lookup instead of accepting an algorithm selected by an untrusted header.
+    $jwtParts = explode('.', $token);
+    if (count($jwtParts) !== 3) return null;
+    $headerSegment = strtr($jwtParts[0], '-_', '+/');
+    $headerSegment .= str_repeat('=', (4 - strlen($headerSegment) % 4) % 4);
+    $headerJson = base64_decode($headerSegment, true);
+    $jwtHeader = is_string($headerJson) ? json_decode($headerJson, true) : null;
+    if (!is_array($jwtHeader) || ($jwtHeader['alg'] ?? '') !== 'EdDSA') return null;
+
     $authBase = rtrim((string)env_value('NEON_AUTH_BASE_URL', ''), '/');
     $baseParts = parse_url($authBase);
     if (!is_array($baseParts) || strtolower((string)($baseParts['scheme'] ?? '')) !== 'https'
         || empty($baseParts['host'])) {
         return null;
     }
-    $allowedIssuers = array_values(array_unique([
-        $authBase,
-        strtolower((string)$baseParts['scheme']) . '://' . strtolower((string)$baseParts['host'])
-            . (isset($baseParts['port']) ? ':' . (int)$baseParts['port'] : ''),
-    ]));
+
+    // Managed Auth's issuer is the origin of its branch URL, not its /neondb/auth path.
+    $issuerScheme = strtolower((string)$baseParts['scheme']);
+    $issuerHost = strtolower((string)$baseParts['host']);
+    $issuerPort = $baseParts['port'] ?? null;
+    if (($issuerScheme === 'https' && $issuerPort === 443)
+        || ($issuerScheme === 'http' && $issuerPort === 80)) {
+        $issuerPort = null;
+    }
+    $expectedIssuer = $issuerScheme . '://' . $issuerHost
+        . ($issuerPort !== null ? ':' . (int)$issuerPort : '');
 
     \Firebase\JWT\JWT::$leeway = 5;
     for ($attempt = 0; $attempt < 2; $attempt++) {
@@ -968,7 +984,7 @@ function neon_auth_claims(): ?object
             if (!isset($claims->sub, $claims->exp, $claims->iss)
                 || trim((string)$claims->sub) === ''
                 || (int)$claims->exp <= time()
-                || !in_array(rtrim((string)$claims->iss, '/'), $allowedIssuers, true)) {
+                || !hash_equals($expectedIssuer, (string)$claims->iss)) {
                 return null;
             }
             if (isset($claims->iat) && (int)$claims->iat > time() + 60) return null;
@@ -982,7 +998,7 @@ function neon_auth_claims(): ?object
             return $claims;
         } catch (Throwable $error) {
             if ($attempt === 1) return null;
-            // A fresh key set handles Neon Auth signing-key rotation.
+            // Retry once with fresh JWKS to tolerate signing-key rotation.
         }
     }
     return null;
