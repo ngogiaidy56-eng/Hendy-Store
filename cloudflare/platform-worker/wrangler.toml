@@ -8,7 +8,7 @@ workers_dev = true
 [vars]
 HENDY_API_ORIGIN = "https://hendy-store.onrender.com"
 CLOUDFLARE_ACCOUNT_ID = "918ff2f016938fc978ed23b96505b21e"
-ALLOWED_ORIGINS = "https://hendy-store.onrender.com,https://hendy-store.onrender.com,https://hendystore-pages.pages.dev"
+ALLOWED_ORIGINS = "https://hendy-store.onrender.com,https://hendystore-pages.pages.dev"
 DATABASE_PROVIDER = "origin"
 OBJECT_STORAGE_PROVIDER = "neon"
 LEGACY_ORIGIN_PROXY = "true"

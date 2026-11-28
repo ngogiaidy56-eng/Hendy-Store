@@ -3,6 +3,7 @@ services:
     name: hendy-store
     runtime: docker
     plan: free
+    region: singapore
     autoDeployTrigger: checksPass
     healthCheckPath: /api.php?action=health
     envVars:
@@ -16,6 +17,10 @@ services:
         value: auto
       - key: APP_AUTO_DETECT_DOMAINS
         value: "true"
+      - key: APP_ALLOWED_HOSTS
+        value: hendy-store.onrender.com,hendystore-pages.pages.dev
+      - key: APP_ALLOWED_ORIGINS
+        value: https://hendy-store.onrender.com,https://hendystore-pages.pages.dev
       - key: APP_KEY
         generateValue: true
       - key: ADMIN_EMAIL
@@ -25,11 +30,13 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: NEON_AUTH_BASE_URL
-        sync: false
+        value: https://ep-withered-sunset-bekyloue.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth
       - key: NEON_AUTH_JWKS_URL
-        sync: false
+        value: https://ep-withered-sunset-bekyloue.neonauth.c-9.us-east-2.aws.neon.tech/neondb/auth/.well-known/jwks.json
       - key: NEON_AUTH_PUBLIC_SIGNUP
-        value: "true"
+        value: "false"
+      - key: GOOGLE_OAUTH_ENABLED
+        value: "false"
       - key: NEON_DATA_API_URL
         value: https://ep-withered-sunset-bekyloue.apirest.c-9.us-east-2.aws.neon.tech/Hendy_Store/rest/v1
       - key: AWS_ACCESS_KEY_ID
@@ -37,25 +44,29 @@ services:
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
       - key: AWS_ENDPOINT_URL_S3
-        sync: false
+        value: https://br-frosty-wildflower-bevhhzlb.storage.c-9.us-east-2.aws.neon.tech
       - key: AWS_REGION
         value: us-east-2
       - key: NEON_STORAGE_FORCE_PATH_STYLE
         value: "true"
       - key: NEON_STORAGE_BUCKET
         value: hendy-store-files
+      - key: OBJECT_STORAGE_PROVIDER
+        value: neon
+      - key: OBJECT_STORAGE_LEGACY_NEON_READ_FALLBACK
+        value: "false"
       - key: NEON_AI_GATEWAY_BASE_URL
-        sync: false
+        value: https://br-frosty-wildflower-bevhhzlb-api.ai.c-9.us-east-2.aws.neon.tech
       - key: NEON_AI_GATEWAY_TOKEN
         sync: false
       - key: NEON_AI_MODEL
         value: gpt-5-mini
       - key: NEON_REALTIME_URL
-        sync: false
+        value: https://ep-withered-sunset-bekyloue.rt.c-9.us-east-2.aws.neon.tech/
       - key: NEON_REALTIME_SECRET
         sync: false
       - key: NEON_STORE_FUNCTION_URL
-        sync: false
+        value: https://br-frosty-wildflower-bevhhzlb-storeapi.compute.c-9.us-east-2.aws.neon.tech/
       - key: ALLOW_REGISTRATION
         value: "false"
       - key: FORCE_SECURE_COOKIES
@@ -66,26 +77,6 @@ services:
         value: "true"
       - key: MAX_UPLOAD_BYTES
         value: "209715200"
-      - key: OBJECT_STORAGE_PROVIDER
-        sync: false
-      - key: CLOUDFLARE_ACCOUNT_ID
-        sync: false
-      - key: OBJECT_STORAGE_ENDPOINT
-        sync: false
-      - key: OBJECT_STORAGE_REGION
-        sync: false
-      - key: OBJECT_STORAGE_BUCKET
-        sync: false
-      - key: OBJECT_STORAGE_ACCESS_KEY_ID
-        sync: false
-      - key: OBJECT_STORAGE_SECRET_ACCESS_KEY
-        sync: false
-      - key: OBJECT_STORAGE_SESSION_TOKEN
-        sync: false
-      - key: OBJECT_STORAGE_FORCE_PATH_STYLE
-        value: "true"
-      - key: OBJECT_STORAGE_LEGACY_NEON_READ_FALLBACK
-        value: "true"
       - key: MAX_DIRECT_UPLOAD_BYTES
         value: "681574400"
       - key: VIRUSTOTAL_API_KEY
