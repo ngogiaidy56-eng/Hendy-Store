@@ -35,8 +35,14 @@ async function verifyCustomerApiSession(): Promise<void> {
 }
 
 function safeRedirect(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\\\")) return "/account";
-  return value;
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/account";
+  try {
+    const target = new URL(value, window.location.origin);
+    if (target.origin !== window.location.origin) return "/account";
+    return target.pathname + target.search + target.hash;
+  } catch {
+    return "/account";
+  }
 }
 
 export function SignInForm() {
